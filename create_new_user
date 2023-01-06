@@ -1,0 +1,151 @@
+from canvasapi import Canvas
+import pandas as pd
+import csv
+
+
+
+API_KEYLive = 'yourCanvasToken'
+API_URLLive = 'https://YOURINSTITUTION.instructure.com'
+
+#Change FILENAME HERE TO MATCH CURRENT PROJECT
+source_file = 'yoursourcefile.csv'
+report_file = 'afiletoreportto.csv'
+
+
+df=pd.read_csv('source_file')
+
+canvas = Canvas(API_URLLive, API_KEYLive)
+
+account = canvas.get_account(1)
+
+#firstname = input("User's First Name: ")
+#lastname = input("User's Last Name: ")
+#name = firstname + " "+lastname
+#username= input("4J username: ")
+
+
+
+
+
+def new_user(firstname,lastname,name,username):
+    global user
+    email= username+'@yourinstitution.com' ##NOTE: add your institution's email suffix here!!##
+    print(email)
+                 
+    account = canvas.get_account(1)
+
+    user = account.create_user(
+        user={
+            'name': name,
+            'initial_enrollment_type' : "teacher",
+            "skip_registration": True,
+            'force_validations' : True,
+            'enable_sis_reactivation' : True,
+            'skip_confirmation': False
+        
+            
+        },
+        communication_channel={
+            
+            'type':'email',
+            'address':email
+            
+        },
+        pseudonym={
+            
+            'sis_user_id': username,
+            'send_confirmation': True,
+            'unique_id': username
+            
+        }
+        
+        
+    )
+    print(user)
+    print(lastname)
+    print("New User Generated")
+
+
+
+
+def create_course(lastname):
+    global newCourse
+    account = canvas.get_account(1)
+    newCourse = account.create_course(
+        course = {
+            'name': "Sandbox_"+lastname,
+            'sis_course_id': "Sandbox_"+lastname,
+            'is_public': False
+            }
+        )
+    
+    print("Course created", newCourse)
+    return newCourse
+
+
+
+def sandbox_enroll(newCourse,user):
+    target_account = canvas.get_account(1)
+    course = canvas.get_course(newCourse)
+    print("Enrolling in Sandbox")
+    course.enroll_user(user, enrollment_type = "TeacherEnrollment", enrollment={'enrollment_state': 'active'})
+    print("Completed Sandbox Enrollment")
+
+
+def user_found(username,jobrole):
+    user = account.get_users(search_term=username)[0]
+    record = [{
+        'firstname' : user.sortable_name.split(", ")[1],
+        'lastname' : user.sortable_name.split(", ")[0],
+        'username' : user.login_id,
+        'roletype' : jobrole
+        }]
+    dfr = pd.DataFrame(record)
+    dfr.to_csv(report_file, mode='a', index=False, header=False)
+    
+
+
+
+
+
+
+input("Press any key to run program...")
+
+
+
+
+
+
+
+for row in df.itertuples():
+    firstname = row[1]
+    lastname = row[2]
+    username = row[3]
+
+
+    name = firstname+' '+lastname
+    print(firstname, lastname, username)
+
+    search_results = account.get_users(search_term=username)
+    try:
+        search_results[0]
+        print('user found'+firstname,lastname,username)
+        user_found(username,jobrole)
+        
+    except IndexError:
+        print("Creating account for "+firstname,lastname,username)
+        new_user(firstname,lastname,name,username)
+        create_course(lastname)
+        sandbox_enroll(newCourse,user)
+
+
+        user = account.get_users(search_term=username)[0]
+        record = [{
+          'firstname' : user.sortable_name.split(", ")[1],
+          'lastname' : user.sortable_name.split(", ")[0],
+          'username' : user.login_id,
+
+          }]
+        dfr = pd.DataFrame(record)
+        dfr.to_csv(report_file, mode='a', index=False, header=False)
+print("Finished")
